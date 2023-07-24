@@ -1,0 +1,91 @@
+        -:    0:Source:general.c
+        -:    0:Graph:interp_t-general.gcno
+        -:    0:Data:interp_t-general.gcda
+        -:    0:Runs:1
+        -:    1:#include "general.h"
+        -:    2:
+    #####:    3:void on_error(const char* s)
+        -:    4:{
+    #####:    5:   fprintf(stderr, "%s\n", s);
+    #####:    6:   exit(EXIT_FAILURE);
+        -:    7:}
+        -:    8:
+    #####:    9:void* ncalloc(int n, size_t size)
+        -:   10:{
+    #####:   11:   void* v = calloc(n, size);
+    #####:   12:   if(v==NULL){
+    #####:   13:      on_error("Cannot calloc() space");
+        -:   14:   }
+    #####:   15:   return v;
+        -:   16:}
+        -:   17:
+    #####:   18:void n2dfree(void**p, int h)
+        -:   19:{
+        -:   20:   int i;
+    #####:   21:   for(i=0; i<h; i++){
+    #####:   22:      free(p[i]);
+        -:   23:   }
+    #####:   24:   free(p);
+    #####:   25:}
+        -:   26:
+    #####:   27:void** n2drecalloc(void** p, int oh, int nh, int ow, int nw, size_t szelem)
+        -:   28:{
+        -:   29:
+        -:   30:   void** n;
+        -:   31:   int j;
+    #####:   32:   n = n2dcalloc(nh, nw, szelem);
+    #####:   33:   for(j=0; j<oh; j++){
+    #####:   34:      memcpy(n[j], p[j], ow*szelem);
+        -:   35:   }
+    #####:   36:   n2dfree(p, oh);
+    #####:   37:   return n;
+        -:   38:
+        -:   39:}
+        -:   40:
+    #####:   41:void** n2dcalloc(int h, int w, size_t szelem)
+        -:   42:{
+        -:   43:
+        -:   44:   int i;
+        -:   45:   void** p;
+    #####:   46:   p = calloc(h, sizeof(void*));
+    #####:   47:   if(p==NULL){
+    #####:   48:      on_error("Cannot calloc() space");
+        -:   49:   }
+    #####:   50:   for(i=0; i<h; i++){
+    #####:   51:      p[i] = calloc(w, szelem);
+    #####:   52:      if(p[i]==NULL){
+    #####:   53:         on_error("Cannot calloc() space");
+        -:   54:      }
+        -:   55:   }
+    #####:   56:   return p;
+        -:   57:}
+        -:   58:
+    #####:   59:void* nrecalloc(void* p, int oldbytes, int newbytes)
+        -:   60:{
+    #####:   61:   void* n = calloc(newbytes, 1);
+    #####:   62:   if(n==NULL){
+    #####:   63:      on_error("Cannot calloc() space");
+        -:   64:   }
+    #####:   65:   memcpy(n, p, oldbytes);
+    #####:   66:   free(p);
+    #####:   67:   return n;
+        -:   68:}
+        -:   69:
+    #####:   70:void* nremalloc(void* p, int bytes)
+        -:   71:{
+    #####:   72:   void* n = realloc(p, bytes);
+    #####:   73:   if(n==NULL){
+    #####:   74:      on_error("Cannot malloc() space");
+        -:   75:   }
+    #####:   76:   return n;
+        -:   77:}
+        -:   78:
+    #####:   79:void* nfopen(char* fname, char* mode)
+        -:   80:{
+        -:   81:   FILE* fp;
+    #####:   82:   fp = fopen(fname, mode);
+    #####:   83:   if(!fp){
+    #####:   84:      on_error("Cannot open file");
+        -:   85:   }
+    #####:   86:   return fp;
+        -:   87:}

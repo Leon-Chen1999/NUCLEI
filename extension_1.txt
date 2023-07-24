@@ -1,0 +1,12 @@
+For extension, I make two functions. One of them is MINUS function, it is something like PLUS function, and it is easily to finish.
+Here is the formula of the MINUS function.
+(SET A '2')
+(SET B(MINUS A '1' ))
+
+And another function is APPEND. It is similiar with CONS but has many differents. Here is the formula.
+The append procedure appends two (or more) lists to one another. Because Lisp lists are linked lists, appending two lists has asymptotic time complexityO(n) 
+But I didn't finish it,It has some error in the last output.
+(append '(1 2) '(3 4))
+ ;Output: (1 2 3 4)
+ (append '(1 2 3) '() '(a) '(5 6))
+ ;Output: (1 2 3 a 5 6)

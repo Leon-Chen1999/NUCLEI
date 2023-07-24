@@ -1,0 +1,64 @@
+Firstly, I read each ncl file (read_file), save codes into a one-dimensional array, and then judge the one-dimensional array.
+I also created a structure called Var that contains an array of lisp* and a bool variable to determine if it has been set.
+I then create A one-dimensional array of type Var* to store the contents of the A-z variables, either atom or lisp structures.
+
+Because I stored the code in a one-dimensional array, I had to judge the number of parentheses each time to find the next instruction and save all remaining instructions. After parsing the first instruction, repeat parsing all remaining instructions. The same goes for the interp phase.
+For each instruction we need to parse it, first by removing parentheses (subbraces), and then by using the token_get function to obtain the token and the rest of the instruction. Through the token, to judge the instruction belongs to what kind of situation. The parse section analyzes the syntax of a sentence only for errors, and the interp section only for correct values.
+When you're dealing with complex functions, like IF functions. I need to determine which instruction is the condition of the if function, which instructions are executed when the condition is correct and which instructions are executed when the condition is wrong. These are shown in the split_plus and if_rest_test functions.
+
+Finally, I add the testinterp function to the curl.c file to test some code that does not appear in the case. In addition, I also created a wide range of demo.ncl file for black box testing. Finally, I used gcov to get the coverage of all my code, which showed that most of it was valid and executed.
+
+However, I have some code that will work in normal mode, but won't work under _s command, resulting in memory leaks. I tried many times to modify the code and free up the excess memory, but the results were not good.
+
+Last, I use gcov to test my codes.
+Here are the commands using in terminal:
+gcc -DINTERP -Wall -fprofile-arcs -ftest-coverage linked.c nuclei.c general.c -std=c99 -O3 -o interp -lm
+./interp demo.ncl
+gcov nuclei.c 
+
+And I make a new demo test file named demo.ncl to get a black box testing. Through that we can get the code coverage rate to show if my codes have redundancy. 
+Using the command:
+make interp_t
+./interp_t demo.ncl
+gcov interp_t-nuclei.gcno
+
+Then I can get the results:
+File 'nuclei.c'
+Lines executed:59.89% of 753
+Creating 'nuclei.c.gcov'
+
+File '/usr/include/x86_64-linux-gnu/bits/string_fortified.h'
+Lines executed:100.00% of 2
+Creating 'string_fortified.h.gcov'
+
+File '/usr/include/x86_64-linux-gnu/bits/stdio2.h'
+Lines executed:50.00% of 2
+Creating 'stdio2.h.gcov'
+
+Lines executed:59.97% of 757
+
+My codes contain parse and interp parts. And some of my code only use the part of interp. So it is about 50 percents.
+
+On the other way,I use similiar command to test parse.
+make parse_t
+./parse_t demo.ncl
+gcov parse_t-nuclei.gcno
+
+File 'nuclei.c'
+Lines executed:50.75% of 737
+Creating 'nuclei.c.gcov'
+
+File '/usr/include/x86_64-linux-gnu/bits/string_fortified.h'
+Lines executed:100.00% of 2
+Creating 'string_fortified.h.gcov'
+
+File '/usr/include/x86_64-linux-gnu/bits/stdio2.h'
+Lines executed:50.00% of 2
+Creating 'stdio2.h.gcov'
+
+Lines executed:50.88% of 741
+
+Last, although the rates are not really high, because I make the wrong ifdef and endif. So when I use gcov and makefile, it will gcc/clang all the file.But the parse and interp run separately. And we can use nuclei.gcov to check which codes are not used. And I am sure the two pieces of missing code are different.
+
+
+

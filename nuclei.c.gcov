@@ -1,0 +1,1417 @@
+        -:    0:Source:nuclei.c
+        -:    0:Graph:parse_t-nuclei.gcno
+        -:    0:Data:parse_t-nuclei.gcda
+        -:    0:Runs:1
+        -:    1:#include "nuclei.h"
+        -:    2:#include "test.c"
+        -:    3:#include <assert.h>
+        -:    4:
+        -:    5:#define MAX_NUMS 10000
+        -:    6:#define MAXSIZE 5000
+        -:    7:#define SIZE 5000
+        -:    8:#define SMALLSIZE 100
+        -:    9:#define ALPHA 27
+        -:   10:#define CHARA 'A'
+        -:   11:#define CHARZERO '0'
+        -:   12:#define LBRACKET '('
+        -:   13:#define RBRACKET ')'
+        -:   14:#define NEGITAVEVAL -1
+        -:   15:#define MARK '\''
+        -:   16:#define MARKDOUBLE '\"'
+        -:   17:#define SPACESIN ' '
+        -:   18:#define SIX 6
+        -:   19:#define FIVE 5
+        -:   20:#define ELEVEN 11
+        -:   21:#define TEN 10
+        -:   22:#define TWO 2
+        -:   23:#define THREE 3
+        -:   24:#define FOUR 4
+        -:   25:#define SPACE " "
+        -:   26:#define HASH '#'
+        -:   27:#define ARGCTWO 2
+        -:   28:#define LBBRACKET "["
+        -:   29:#define CHARL 'L'
+        -:   30:#define CHARC 'C'
+        -:   31:#define ENDFILE '\0'
+        -:   32:#define MINUSMARK '-'
+        -:   33:#define ENDNULL ""
+        -:   34:
+        -:   35:
+        1:   36:int main(int argc, char* argv[]){
+        1:   37:    if(argc != ARGCTWO){
+    #####:   38:        fprintf(stderr,"Missing argv!");
+    #####:   39:        exit(EXIT_FAILURE);
+        -:   40:    }
+        -:   41:    #ifdef INTERP
+        -:   42:    bool interp = read_file(argv[1]);
+        -:   43:    if(interp == false){
+        -:   44:        exit(EXIT_FAILURE);
+        -:   45:        // printf("interp fail!\n");
+        -:   46:    }
+        -:   47:    #else
+        1:   48:    bool parse = read_file(argv[1]);
+        1:   49:    if(parse == true){
+        -:   50:        printf("Parsed OK\n");
+        -:   51:    }else{
+        -:   52:        printf("Parsed fail!\n");
+        -:   53:    }   
+        -:   54:    #endif
+        1:   55:    testinterp(); 
+        -:   56:    return 0;
+        -:   57:}
+        -:   58:
+        1:   59:bool read_file(char* argv){
+        1:   60:    FILE* fp = fopen(argv, "r");
+        -:   61:    //判断打开是否失败
+        1:   62:    if(fp == NULL){
+    #####:   63:        fprintf(stderr,"Error!\n");
+    #####:   64:        exit(EXIT_FAILURE);
+        -:   65:    }
+        -:   66:    int line = 0;
+        -:   67:    char Buffer[SIZE];
+        -:   68:    nuclei copy;
+        -:   69:    char out[SIZE];  //保存文件内容的数组
+        1:   70:    out[0] = ENDFILE;
+       33:   71:    while(fscanf(fp,"%[^\n]\n",Buffer) != EOF){
+       31:   72:        if(Buffer[0]!=HASH){
+        -:   73:            strcat(out, Buffer);
+        -:   74:            strcat(out, SPACE);
+        -:   75:            line++;
+        -:   76:        }
+        -:   77:
+        -:   78:    }
+        -:   79:    strcpy(copy.file,out);
+        -:   80:    #ifdef INTERP
+        -:   81:    Var arr[ALPHA] = {{false, NULL}};
+        -:   82:    bool judge_interp_type = judge_interp(&copy,arr);
+        -:   83:    // free_var(arr);
+        -:   84:    fclose(fp);
+        -:   85:    return judge_interp_type;
+        -:   86:    #else
+        1:   87:    bool judge_parse = judge_parser(&copy);
+        1:   88:    fclose(fp);
+        1:   89:    return judge_parse;
+        -:   90:    #endif
+        -:   91:
+        -:   92:}
+        -:   93:
+        1:   94:bool judge_parser(nuclei* instruct){
+        -:   95:    bool parser_type = false;
+        -:   96:    bool prog_type = false;
+        -:   97:    bool bracket_type = false;
+        -:   98:    prog_type = prog(instruct);//判断是否符合prog
+        1:   99:    bracket_type = bracket_judge(instruct);//bracket?????
+        -:  100:    //都符合就为true
+        1:  101:    if(prog_type == true && bracket_type == true){
+        -:  102:        parser_type = true;
+        -:  103:    }
+        1:  104:    return parser_type;
+        -:  105:}
+        -:  106:
+    #####:  107:bool prog(nuclei* instruct){
+       1*:  108:    if(instruct->file[0] != LBRACKET){
+        -:  109:        return false;
+        -:  110:    }
+        -:  111:    bool split_type = true;
+       1*:  112:    split_type = split(instruct);
+        -:  113:    // printf("3333333333\n");
+       1*:  114:    return split_type;
+        -:  115:}
+        -:  116:
+        -:  117://only get the token and the rest of the instructions
+        -:  118://rest is a var/ins/list
+      109:  119:void token_get(char* tmp,char* token,char* rest){
+        -:  120:    int end = 0;
+        -:  121:    int index = 0;
+      109:  122:    int len = strlen(tmp);
+        -:  123:    int mark = 0;
+     1534:  124:    for(int i = 0;i<len;i++){
+     1425:  125:        if(tmp[index] == MARKDOUBLE){
+    #####:  126:            mark++;
+        -:  127:        }
+        -:  128:    }
+      109:  129:    if(tmp[0] != MARK && mark ==0){
+      473:  130:        while(end == 0){// while space ,get the end of the token
+      379:  131:            if(tmp[index] == SPACESIN || tmp[index] == ENDFILE){ 
+        -:  132:                end = index;
+        -:  133:            }
+      379:  134:            index++;
+        -:  135:        }
+      379:  136:        for(int i = 0;i<end;i++){
+      285:  137:            token[i] = tmp[i];
+        -:  138:        }
+       94:  139:        token[end] = ENDFILE;
+        -:  140:        int start = 0;
+        -:  141:        bool space = false;
+     1166:  142:        for(int i = end;i<len;i++){
+     1072:  143:            if(tmp[i] == SPACESIN){
+        -:  144:                space = true;
+        -:  145:            }
+      811:  146:            if(space == true){
+     1072:  147:                rest[start++] = tmp[i+1];
+        -:  148:            }
+        -:  149:        }
+       15:  150:    }else if(tmp[0] != MARK || mark != 0){
+    #####:  151:        for(int i = 0;i<len;i++){
+    #####:  152:            token[i] = tmp[i];
+        -:  153:        }
+    #####:  154:        token[len] = ENDFILE;
+        -:  155:    }else if(tmp[0] == MARK){
+       83:  156:        for(int i = 0;i<len;i++){
+       68:  157:            token[i] = tmp[i];
+        -:  158:        }
+        -:  159:    }
+      109:  160:    rest[len] = ENDFILE;
+      109:  161:}
+        -:  162:
+        1:  163:bool bracket_judge(nuclei* instruct){
+        -:  164:    // printf("11111111111\n");///////////////////
+        1:  165:    char copy[SIZE] = ENDNULL;
+        1:  166:    strcpy(copy,instruct->file);
+        -:  167:    int bracket = 1;
+        -:  168:    int index = 1;
+        -:  169:    int mark = 0;
+        -:  170:    while(bracket != 0){
+        -:  171:        if(copy[index] == MARK){
+        -:  172:            mark++;
+        -:  173:        }
+        -:  174:        if(copy[index] == LBRACKET && mark%TWO == 0){
+        -:  175:            bracket++;
+        -:  176:        }
+        -:  177:        if(copy[index] == RBRACKET && mark%TWO == 0){
+        -:  178:            bracket--;
+        -:  179:        }
+        -:  180:        index++;
+        -:  181:    }
+        -:  182:    if(bracket != 0){
+        -:  183:        return false;
+        -:  184:    }
+        -:  185:    (void) instruct;
+        -:  186:    return true;
+        -:  187:}
+        -:  188:
+        1:  189:bool split(nuclei* instruct){
+        1:  190:    char copy[SIZE] = ENDNULL;
+        1:  191:    strcpy(copy,instruct->file);
+        1:  192:    subprog(copy);
+        -:  193:    bool out = true;
+        1:  194:    out = get_instruction(copy);
+        -:  195:    //要判断括号数是否相同，相同就结束
+        1:  196:    return out;
+        -:  197:}
+        -:  198:
+        -:  199://去掉最外面的大括号
+        8:  200:void subprog(char* copy){
+        8:  201:    char tmp[SIZE] = ENDNULL;
+        8:  202:    int len = strlen(copy);
+        -:  203:    int index = 0, left_bracket = 0, right_bracket = 0, j = 0;
+        -:  204:    int bracket = 0, start = 0, mark = 0, end = 0;//总共有多少括号
+       26:  205:    while(left_bracket != TWO){
+       18:  206:        if(copy[index] == LBRACKET){
+       16:  207:            left_bracket++;
+        -:  208:        }
+       18:  209:        if(left_bracket == TWO){
+        -:  210:            start = index;
+        -:  211:        }
+       18:  212:        index++;
+        -:  213:    }
+        -:  214:    for(int i = 0;i<len;i++){
+        -:  215:        if(copy[i] == MARK){
+        -:  216:            mark++;
+        -:  217:        }
+        -:  218:        if(copy[i] == LBRACKET && mark%TWO == 0){
+        -:  219:            bracket++;
+        -:  220:        }
+        -:  221:    }
+      869:  222:    for(int i = len;i>0;i--){
+      861:  223:        if(copy[i] == RBRACKET){
+       94:  224:            right_bracket++;
+        -:  225:        }
+      861:  226:        if(right_bracket == 1){
+        -:  227:            end = i;
+        -:  228:        }
+        -:  229:    }
+      848:  230:    for(int i=start;i<end;i++){
+      840:  231:        tmp[j] = copy[i];
+      840:  232:        j++;
+        -:  233:    }
+        -:  234:    strcpy(copy," ");
+        8:  235:    int len1 = strlen(tmp);
+      848:  236:    for(int i=0;i<len1;i++){
+      840:  237:        copy[i] = tmp[i];
+        -:  238:    }
+        8:  239:    copy[len1] = ENDFILE;
+        8:  240:}
+        -:  241:
+        -:  242://把去掉最外面括号的指令再拆开成tmp和rest
+       34:  243:bool get_instruction(char* copy){
+       34:  244:    char rest[SIZE] = ENDNULL, tmp[SIZE] = ENDNULL;
+       34:  245:    int len = strlen(copy);
+        -:  246:    int index = 1, end = 0, bracket = 1,start = 0;
+      814:  247:    while(bracket != 0){
+      780:  248:        if(copy[index] == LBRACKET){
+       52:  249:            bracket++;
+      728:  250:        }else if(copy[index] == RBRACKET){
+       86:  251:            bracket--;
+        -:  252:        }
+      780:  253:        index++;
+        -:  254:    }
+        -:  255:    end = index;
+      848:  256:    for(int i = 0;i<end;i++){
+      814:  257:        tmp[i] = copy[i];
+        -:  258:    }
+     7006:  259:    for(int i = end+1;i<len;i++){
+     6972:  260:        rest[start++] = copy[i];
+        -:  261:    }
+       34:  262:    rest[len] = ENDFILE;
+       34:  263:    int lenrest = strlen(rest);
+        -:  264:    bool instract_type = false;
+       34:  265:    instract_type = instract_judge(tmp);
+       34:  266:    if(lenrest != 0){
+       26:  267:        get_instruction(rest);
+        -:  268:    }
+       34:  269:    return instract_type;
+        -:  270:}
+        -:  271:
+        -:  272://instract的判别
+       34:  273:bool instract_judge(char* tmp){
+        -:  274:    bool judge_type = false;
+       34:  275:    char token[MAX_NUMS] = ENDNULL;
+       34:  276:    char rest[MAX_NUMS] = ENDNULL;
+       34:  277:    subbraces(tmp);
+       34:  278:    token_get(tmp,token,rest);
+       34:  279:    judge_type = fun_cmp(token,rest);//change to bool!!!!!!
+       34:  280:    return judge_type;
+        -:  281:}
+        -:  282:
+        -:  283://去掉每个instruction的括号
+       64:  284:void subbraces(char* copy){
+       64:  285:    char tmp[SIZE] = ENDNULL;
+       64:  286:    int len = strlen(copy);
+        -:  287:    int index = 1, mark = 0, mark2 = 0, bracket = 1, j = 0;
+        -:  288:    while(bracket != 0){
+        -:  289:        if(copy[index] == MARK){
+        -:  290:            mark++;
+        -:  291:        }        
+        -:  292:        if(copy[index] == MARKDOUBLE){
+        -:  293:            mark2++;
+        -:  294:        }
+        -:  295:        if(copy[index] == LBRACKET && mark%TWO == 0 && mark2%TWO == 0){
+        -:  296:            bracket++;
+        -:  297:        }else if(copy[index] == RBRACKET && mark%TWO == 0&& mark2%TWO == 0){
+        -:  298:            bracket--;
+        -:  299:        }
+        -:  300:        index++;
+        -:  301:    }
+     1210:  302:    for(int i=1;i<len-1;i++){
+     1146:  303:        tmp[j] = copy[i];
+     1146:  304:        j++;
+        -:  305:    }
+        -:  306:    strcpy(copy,ENDNULL);
+       64:  307:    int len1 = strlen(tmp);
+     1210:  308:    for(int i=0;i<len1;i++){
+     1146:  309:        copy[i] = tmp[i];
+        -:  310:    }
+       64:  311:    copy[len1] = ENDFILE;
+       64:  312:}
+        -:  313:
+       34:  314:bool fun_cmp(char* token,char* rest){// change to bool!!!!!!!!!!!
+        -:  315:    bool fun_cmp_type = false;
+       34:  316:    if(strcmp(token, "SET") == 0){
+       15:  317:        fun_cmp_type = set_func(rest);//judge setfunction whether true
+        -:  318:    }
+        -:  319:    // if token is PRINT then get in printfunc
+       34:  320:    if(strcmp(token,"PRINT") == 0){
+       15:  321:        fun_cmp_type = print_func(rest);
+        -:  322:    }
+       34:  323:    if(strcmp(token,"WHILE") == 0){
+        1:  324:        fun_cmp_type = while_func(rest);
+        -:  325:    }
+       34:  326:    if(strcmp(token,"IF") == 0){
+        3:  327:        fun_cmp_type = if_func(rest);
+        -:  328:    }
+       34:  329:    return fun_cmp_type;
+        -:  330:}
+        -:  331:
+       15:  332:bool set_func(char* tmp){
+       15:  333:    char token[MAX_NUMS] = ENDNULL;
+       15:  334:    char rest[MAX_NUMS] = ENDNULL;
+        -:  335:    bool setfunc = false;
+       15:  336:    token_get(tmp,token,rest);
+        -:  337:    //判断完set_func里面的VAR之后判断LIST  
+       15:  338:    if(tmp[0] >= 'A' && tmp[0] <= 'Z'){
+       15:  339:        setfunc =  list_judge(rest);
+        -:  340:    }
+       15:  341:    return setfunc;
+        -:  342:}
+        -:  343:
+       15:  344:bool print_func(char* tmp){
+       15:  345:    int len = strlen(tmp);
+        -:  346:    int string_amount = 0;
+        -:  347:    bool string_type = false;
+       72:  348:    for(int i = 0;i<len;i++){
+       57:  349:        if(tmp[i] == MARKDOUBLE){
+       12:  350:            string_amount++;
+        -:  351:        }
+        -:  352:    }
+       15:  353:    if(string_amount == TWO ||string_amount == 0){
+        -:  354:        string_type = true;
+        -:  355:    }
+       15:  356:    return string_type;
+        -:  357:}
+        -:  358:
+        -:  359://对list进行判断
+       52:  360:bool list_judge(char* tmp){
+        -:  361:    bool outcome = false, ret = false;
+        -:  362:    bool val = false, literal = false, nil = false;
+       52:  363:    char token[MAX_NUMS] = ENDNULL, rest[MAX_NUMS] = ENDNULL;
+       52:  364:    if(tmp[0] != LBRACKET){
+       34:  365:        token_get(tmp,token,rest);
+       34:  366:        if(token[0] == MARK){
+        -:  367:            literal = literal_judge(token);
+       19:  368:        }else if(token[0] >= 'A' && token[0] <= 'Z'){
+        -:  369:            val = true;
+    #####:  370:        }else if(token[0] == MARKDOUBLE){
+    #####:  371:            if(strcmp(token,"NIL") == 0){
+        -:  372:                nil = true;
+        -:  373:            }
+        -:  374:        }
+        -:  375:    }else if(tmp[0] == LBRACKET){
+       18:  376:        subbraces(tmp);
+       18:  377:        token_get(tmp,token,rest);
+       18:  378:        ret_function(token,rest);
+        -:  379:        ret = true;
+        -:  380:    }
+       52:  381:    if(val == true || literal == true || nil == true || ret == true){
+        -:  382:        outcome = true;
+        -:  383:    }
+       52:  384:    return outcome;
+        -:  385:}
+        -:  386://对literal进行判断，是否是(1)，1，(1 (2 3))
+    #####:  387:bool literal_judge(char* tmp){
+        -:  388:    int mark = 0, index = 0, end = 0;//单引号的个数，两个就结束
+        -:  389:    bool state = false;
+        -:  390:    //匹配单引号
+        -:  391:    while(state == false){
+        -:  392:        if(tmp[index] == MARK ){
+        -:  393:            mark++;
+        -:  394:        }else if(mark == TWO){
+        -:  395:            state = true;
+        -:  396:            end = index;
+        -:  397:        }
+        -:  398:        index++;
+        -:  399:    }//tmp[0] == ' ,tmp[1] == 1
+        -:  400:    for(int i = 1;i<end;i++){
+        -:  401:    }
+    #####:  402:    return state;
+        -:  403:}
+        -:  404:
+       18:  405:bool ret_function(char* token,char* rest){
+        -:  406:    bool l1 = false, l2 = false, l3 = false;
+        -:  407:    bool l4 = false, l5 = false, l6 = false;
+       18:  408:    if(strcmp(token,"CAR") == 0 ||strcmp(token,"CDR") == 0){
+        6:  409:        l1 = list_func(rest);
+        -:  410:    }    
+       18:  411:    if(strcmp(token,"CONS") == 0){
+        6:  412:        l2 = list_func_cons(rest);
+        -:  413:    }
+       18:  414:    if(strcmp(token,"LENGTH") == 0){
+        1:  415:        l3 = int_func_length(rest);
+        -:  416:    }
+       18:  417:    if(strcmp(token,"PLUS") == 0){
+        3:  418:        l4 = int_func_plus(rest);
+        -:  419:    }
+       18:  420:    if(strcmp(token,"LESS") == 0 ||strcmp(token,"GREATER") == 0){
+    #####:  421:        l5 = bool_func(rest);
+        -:  422:    }
+       18:  423:    if(strcmp(token,"EQUAL") == 0){
+    #####:  424:        l6 = bool_func(rest);
+        -:  425:    }
+      18*:  426:    return l1 && l2 && l3 && l4 && l5 && l6;
+        -:  427:}
+        -:  428:
+        6:  429:bool list_func(char* tmp){
+        -:  430:    bool list_func_type = false;
+        6:  431:    list_func_type = list_judge(tmp);
+        6:  432:    return list_func_type;
+        -:  433:}
+        -:  434:
+        6:  435:bool list_func_cons(char* copy){
+        6:  436:    char tmp[SIZE] = ENDNULL;
+        6:  437:    char rest[SIZE] = ENDNULL;
+        -:  438:    int space = 0, end = 0, start = 0, i = 0;
+        6:  439:    int len = strlen(copy);
+        -:  440:    bool l1 = false, l2 = false;
+       26:  441:    while(space == 0){
+       20:  442:        if(copy[i] == SPACESIN){
+        -:  443:            space++;
+        -:  444:            end = i;
+        -:  445:        }
+       20:  446:        i++;
+        -:  447:    }
+       20:  448:    for(int i = 0;i<end;i++){
+       14:  449:        tmp[i] = copy[i];
+        -:  450:    }
+        6:  451:    tmp[end] = ENDFILE;
+       33:  452:    for(int i = end+1;i<len;i++){
+       27:  453:        rest[start++] = copy[i];
+        -:  454:    }
+        6:  455:    rest[len-end] = ENDFILE;
+        6:  456:    l1 =  list_judge(tmp);
+        6:  457:    l2 = list_judge(rest);
+        6:  458:    return l1 && l2;
+        -:  459:}
+        -:  460:
+        3:  461:bool int_func_plus(char* copy){
+        3:  462:    char tmp[SIZE] = ENDNULL;
+        3:  463:    char rest[SIZE] = ENDNULL;
+        -:  464:    int end = 0;
+        3:  465:    int len = strlen(copy);
+        -:  466:    bool l1 = false;
+        -:  467:    bool l2 = false;
+        3:  468:    split_list(copy,tmp,rest);
+        3:  469:    rest[len-end] = ENDFILE;
+        3:  470:    l1 = list_judge(tmp);
+        3:  471:    l2 = list_judge(rest);
+        3:  472:    return l1 && l2;
+        -:  473:}
+        -:  474:
+        1:  475:bool int_func_length(char* copy){
+        -:  476:    bool int_func_type = false;
+        1:  477:    int_func_type = list_judge(copy);
+        1:  478:    return int_func_type;
+        -:  479:}
+        -:  480:
+        4:  481:bool bool_func(char* copy){
+        4:  482:    char tmp[SIZE] = ENDNULL, rest[SIZE] = ENDNULL;
+        4:  483:    char rest1[SIZE] = ENDNULL, rest2[SIZE] = ENDNULL;
+        -:  484:    int space = 0, end = 0, start = 0, i = 0;
+        4:  485:    int len = strlen(copy);
+        -:  486:    bool l1 = false, l2 = false, l3 = false;
+       27:  487:    while(space == 0){
+       23:  488:        if(copy[i] == SPACESIN){
+        -:  489:            space++;
+        -:  490:            end = i;
+        -:  491:        }
+       23:  492:        i++;
+        -:  493:    }
+       23:  494:    for(int i = 0;i<end;i++){
+       19:  495:        tmp[i] = copy[i];
+        -:  496:    }
+        4:  497:    tmp[end] = ENDFILE;
+       40:  498:    for(int i = end+1;i<len;i++){
+       36:  499:        rest[start++] = copy[i];
+        -:  500:    }
+        4:  501:    rest[len-end] = ENDFILE;
+        4:  502:    l1 = list_judge(tmp);
+        4:  503:    split_list(rest,rest1,rest2);
+        4:  504:    l2 = list_judge(rest1);
+        4:  505:    l3 = list_judge(rest2);
+        4:  506:    return l1 && l2 && l3;
+        -:  507:}
+        -:  508:
+        1:  509:bool while_func(char* copy){
+        1:  510:    char condition[SIZE] = ENDNULL, rest[SIZE] = ENDNULL;
+        1:  511:    int len = strlen(copy);
+        -:  512:    int index = 1, end = 0, bracket = 1, start = 0;
+        -:  513:    bool l1 = false, l2 = false;
+       13:  514:    while(bracket != 0){
+       12:  515:        if(copy[index] == LBRACKET){
+    #####:  516:            bracket++;
+       12:  517:        }else if(copy[index] == RBRACKET){
+        1:  518:            bracket--;
+        -:  519:        }
+       12:  520:        index++;
+        -:  521:    }
+        -:  522:    end = index;
+       14:  523:    for(int i = 0;i<end;i++){
+       13:  524:        condition[i] = copy[i];
+        -:  525:    }
+      102:  526:    for(int i = end+1;i<len;i++){
+      101:  527:        rest[start++] = copy[i];
+        -:  528:    }
+        1:  529:    rest[len] = ENDFILE;
+        1:  530:    subbraces(condition);
+        1:  531:    l1 = bool_func(condition);
+        1:  532:    subprog(rest);
+        1:  533:    l2 = get_instruction(rest);
+        1:  534:    return l1 && l2;
+        -:  535:}
+        -:  536:
+        3:  537:bool if_func(char* copy){
+        3:  538:    char condition[SIZE] = ENDNULL, rest[SIZE] = ENDNULL;
+        3:  539:    char rest1[SIZE] = ENDNULL, rest2[SIZE] = ENDNULL;
+        3:  540:    int len = strlen(copy), start = 0;
+        -:  541:    int index = 1, end = 0, bracket = 1, start_rest = 0;
+        -:  542:    bool l1 = false, l2 = false, l3 = false;
+       54:  543:    while(bracket != 0){
+       51:  544:        if(copy[index] == LBRACKET){
+        1:  545:            bracket++;
+       50:  546:        }else if(copy[index] == RBRACKET){
+        4:  547:            bracket--;
+        -:  548:        }
+       51:  549:        index++;
+        -:  550:    }
+        -:  551:    end = index;
+       57:  552:    for(int i = 0;i<end;i++){
+       54:  553:        condition[i] = copy[i];
+        -:  554:    }
+        -:  555:    int i = end;
+       11:  556:    while(start_rest == 0){
+        8:  557:        if(copy[i] == LBRACKET){
+        -:  558:            start_rest = i;
+        -:  559:        }
+        8:  560:        i++;
+        -:  561:    }
+      115:  562:    for(int i = start_rest-1;i<len;i++){
+      112:  563:        rest[start++] = copy[i];
+        -:  564:    }
+        3:  565:    rest[len] = ENDFILE;
+        3:  566:    subbraces(condition);
+        3:  567:    l1 = bool_func(condition);
+        3:  568:    if_rest_test(rest,rest1,rest2);
+        3:  569:    subprog(rest1);
+        3:  570:    subprog(rest2);
+        3:  571:    l2 = get_instruction(rest1);
+        3:  572:    l3 = get_instruction(rest2);
+        3:  573:    return l1 && l2 && l3;
+        -:  574:}
+        -:  575:
+        7:  576:void split_list(char* copy,char* tmp, char* rest){
+        -:  577:    int index = 0, end = 0, mark = 0, start = 0, start_r = 0;
+        7:  578:    int len = strlen(copy);
+        7:  579:    if(copy[0] >= 'A' && copy[0] <= 'Z'){
+        -:  580:        end = 0;
+        6:  581:    }else if(copy[0] == MARK){
+       12:  582:        while(mark != TWO){
+        9:  583:            if(copy[index] == MARK){
+        6:  584:                mark++;
+        -:  585:                end = index;
+        -:  586:            }
+        9:  587:            index++;
+        -:  588:        }
+        3:  589:    }else if(copy[0] == MARKDOUBLE){
+    #####:  590:        while(mark == 0){
+    #####:  591:            if(copy[index] == MARKDOUBLE){
+        -:  592:                mark++;
+        -:  593:                end = index;
+        -:  594:            }
+    #####:  595:            index++;
+        -:  596:        }
+        3:  597:    }else if(copy[0] == LBRACKET){
+       29:  598:        while(end == 0){
+       26:  599:            if(copy[index] == LBRACKET){
+        3:  600:                mark++;
+       23:  601:            }else if(copy[index] == RBRACKET){
+        3:  602:                mark--;
+        -:  603:            }
+       26:  604:            if(mark == 0 && index != 0){
+        -:  605:                end = index;
+        -:  606:            }
+       26:  607:            index++;
+        -:  608:        }
+        -:  609:
+        -:  610:    }
+       43:  611:    for(int i = 0;i<end+1;i++){
+       36:  612:        tmp[start++] = copy[i];
+        -:  613:    }
+        7:  614:    tmp[end+1] = ENDFILE;
+       16:  615:    while(copy[end+1] == SPACESIN){
+        9:  616:        end++;
+        -:  617:    }
+       47:  618:    for(int i = end+1;i<len;i++){
+       40:  619:        rest[start_r++] = copy[i];
+        -:  620:    }
+        7:  621:    rest[len] = ENDFILE;
+        7:  622:}
+        -:  623:
+        3:  624:bool if_rest_test(char* copy, char* rest1, char* rest2){
+        -:  625:    int bracket2 = 0, end = 0, start1 = 0,k = 0, j = 0;
+        3:  626:    int len = strlen(copy);
+        -:  627:    int index = 0, bracket = 0, mark = 0, first_start = 0;
+       67:  628:    while(bracket != FOUR){
+       64:  629:        if(copy[index] == MARKDOUBLE){
+        6:  630:            mark++;
+        -:  631:        }
+       64:  632:        if(copy[index] == LBRACKET || copy[index] == RBRACKET){
+       12:  633:            if(mark%TWO ==0){
+       12:  634:                bracket++;
+        -:  635:            }
+       12:  636:            if(bracket == 1){
+        -:  637:                first_start = index;
+        -:  638:            }
+        -:  639:        }
+       64:  640:        index++;
+        -:  641:    }
+        -:  642:    end = index;
+       64:  643:    for(int i = first_start;i<end;i++,k++){
+       61:  644:        rest1[k] = copy[i];
+        -:  645:    }
+        7:  646:    while(bracket2 == 0){
+        4:  647:        if(copy[index] == LBRACKET){
+        -:  648:            bracket2++;
+        -:  649:        }
+        4:  650:        index++;
+        -:  651:    }
+        -:  652:    start1 = index;
+       50:  653:    for(int i = start1-1;i<len;i++){
+       47:  654:        rest2[j++] = copy[i];
+        -:  655:    }
+        3:  656:    return true;
+        -:  657:}
+        -:  658:
+        -:  659:
+        -:  660:/*interpret*/
+        -:  661:
+        -:  662:
+    #####:  663:bool judge_interp(nuclei* instruct, Var* arr){
+        -:  664:
+        -:  665:    bool prog_type = prog_interp(instruct,arr);//判断是否符合prog
+    #####:  666:    return prog_type;
+        -:  667:}
+        -:  668:
+    #####:  669:bool prog_interp(nuclei* instruct, Var* arr){
+        -:  670:    bool split_type = true;
+    #####:  671:    split_type = split_interp(instruct,arr);
+    #####:  672:    return split_type;
+        -:  673:}
+        -:  674:
+    #####:  675:bool split_interp(nuclei* instruct, Var* arr){
+    #####:  676:    char copy[SIZE] = ENDNULL;
+    #####:  677:    strcpy(copy,instruct->file);
+    #####:  678:    subprog(copy);
+        -:  679:    bool out = true;
+    #####:  680:    out = get_instruction_in(copy,arr);
+    #####:  681:    return out;
+        -:  682:}
+        -:  683:
+        -:  684:
+        -:  685://把去掉最外面括号的指令再拆开成tmp和rest
+    #####:  686:bool get_instruction_in(char* copy, Var* arr){
+    #####:  687:    char rest[SIZE] = ENDNULL, tmp[SIZE] = ENDNULL;
+    #####:  688:    int len = strlen(copy);
+        -:  689:    int index = 1, end = 0, bracket = 1;
+    #####:  690:    while(bracket != 0){
+    #####:  691:        if(copy[index] == LBRACKET){
+    #####:  692:            bracket++;
+    #####:  693:        }else if(copy[index] == RBRACKET){
+    #####:  694:            bracket--;
+        -:  695:        }
+    #####:  696:        index++;
+        -:  697:    }
+        -:  698:    end = index;
+    #####:  699:    for(int i = 0;i<end;i++){
+    #####:  700:        tmp[i] = copy[i];
+        -:  701:    }
+        -:  702:    int start = 0;
+    #####:  703:    for(int i = end+1;i<len;i++){
+    #####:  704:        rest[start++] = copy[i];
+        -:  705:    }
+    #####:  706:    rest[len] = ENDFILE;
+    #####:  707:    int lenrest = strlen(rest);
+        -:  708:    bool instract_type = false;
+    #####:  709:    instract_type = instract_judge_in(tmp,arr);
+    #####:  710:    if(lenrest != 0){
+    #####:  711:        get_instruction_in(rest,arr);
+        -:  712:    }
+    #####:  713:    return instract_type;
+        -:  714:}
+        -:  715:
+        -:  716://instract的判别
+        4:  717:bool instract_judge_in(char* tmp, Var* arr){
+        -:  718:    bool judge_type = false;
+        4:  719:    char token[MAX_NUMS] = ENDNULL;
+        4:  720:    char rest[MAX_NUMS] = ENDNULL;
+        4:  721:    subbraces(tmp);
+        4:  722:    token_get(tmp,token,rest);
+        4:  723:    judge_type = fun_cmp_in(token,rest,arr);//change to bool!!!!!!
+        4:  724:    return judge_type;
+        -:  725:}
+        -:  726:
+        5:  727:bool fun_cmp_in(char* token,char* rest,Var* arr){// change to bool!!!!!!!!!!!
+        -:  728:    bool fun_cmp_type = false;
+        5:  729:    if(strcmp(token, "SET") == 0){
+    #####:  730:        fun_cmp_type = set_func_in(rest,arr);//judge setfunction whether true
+        -:  731:    }
+        5:  732:    if(strcmp(token,"PRINT") == 0){
+    #####:  733:        fun_cmp_type = print_func_in(rest,arr);
+    #####:  734:        if(fun_cmp_type == true){
+        -:  735:            return true;
+        -:  736:        }
+        -:  737:    }
+        5:  738:    if(strcmp(token,"WHILE") == 0){
+    #####:  739:        char condition[SIZE] = ENDNULL;
+    #####:  740:        split_plus(rest,condition,rest);
+    #####:  741:        sub(rest);
+    #####:  742:        while(judge_cond(condition,arr)){
+    #####:  743:            addbraces(condition);
+    #####:  744:            get_instruction_in(rest,arr);
+        -:  745:        }
+    #####:  746:        if(fun_cmp_type == true){
+    #####:  747:            return true;
+        -:  748:        }
+        -:  749:    }
+        5:  750:    if(strcmp(token,"IF") == 0){
+    #####:  751:        char condition[SIZE] = ENDNULL;
+    #####:  752:        char rest1[SIZE] = ENDNULL;
+    #####:  753:        char rest2[SIZE] = ENDNULL;
+    #####:  754:        split_plus(rest,condition,rest);
+    #####:  755:        if_rest_test(rest,rest1,rest2);
+    #####:  756:        if(judge_cond(condition,arr)){
+    #####:  757:            subbraces(rest1);
+    #####:  758:            fun_cmp_type = instract_judge_in(rest1,arr);
+        -:  759:        }else{
+    #####:  760:            subbraces(rest2);
+    #####:  761:            fun_cmp_type = instract_judge_in(rest2,arr);
+        -:  762:        }
+    #####:  763:        if(fun_cmp_type == true){
+    #####:  764:            return true;
+        -:  765:        }
+        -:  766:    }
+        -:  767:    return fun_cmp_type;
+        -:  768:}
+        -:  769:
+    #####:  770:bool print_func_in(char* tmp, Var* arr){
+    #####:  771:    int len = strlen(tmp);
+    #####:  772:    char token[SIZE] = ENDNULL, rest[SIZE] = ENDNULL, str[SIZE] = ENDNULL;
+        -:  773:    bool print_type = false;
+    #####:  774:    if(tmp[0] == MARKDOUBLE){
+    #####:  775:        for(int i = 1;i<len-1;i++){
+    #####:  776:            printf("%c",tmp[i]);
+        -:  777:        }
+        -:  778:        printf("\n");
+    #####:  779:        return true;
+    #####:  780:    }else if(tmp[0] == LBRACKET){//(CAR A)
+        -:  781:        print_type = true;
+    #####:  782:        subbraces(tmp);
+    #####:  783:        token_get(tmp,token,rest);
+    #####:  784:        if(strcmp(token,"CAR") == 0){
+    #####:  785:            int j = lisp_getval(lisp_car(arr[*rest - CHARA].list));
+        -:  786:            printf("%d\n",j);
+        -:  787:        }else{//(CONS '1' (CONS '2' NIL))
+    #####:  788:            char rest1[SIZE] = ENDNULL, rest2[SIZE] = ENDNULL;
+    #####:  789:            split_print_cons(rest,rest1,rest2);
+        -:  790:            lisp* lisp1 = NULL;
+        -:  791:            lisp* lisp2 = NULL;
+    #####:  792:            char index[SMALLSIZE] = LBBRACKET;
+    #####:  793:            lisp1 = print_cons(rest1,index,lisp1,arr);
+    #####:  794:            lisp2 = print_cons(rest2,index,lisp2,arr);
+    #####:  795:            char str1[SIZE] = ENDNULL;
+    #####:  796:            char str2[SIZE] = ENDNULL;
+    #####:  797:            lisp_tostring(lisp1,str1);
+    #####:  798:            lisp_tostring(lisp2,str2);
+    #####:  799:            arr[ALPHA-1].list = cons(lisp1,lisp2);
+    #####:  800:            lisp_tostring(arr[ALPHA-1].list,str);
+        -:  801:            printf("%s\n",str);
+        -:  802:        }
+        -:  803:    }else{
+        -:  804:        print_type = true;
+    #####:  805:        lisp_tostring(arr[*tmp - CHARA].list,str);
+        -:  806:        printf("%s\n",str);
+        -:  807:    }
+        -:  808:    return print_type;
+        -:  809:}
+        -:  810:
+        1:  811:bool set_func_in(char* tmp, Var* arr){
+        1:  812:    char index[MAX_NUMS] = ENDNULL;
+        1:  813:    char rest[MAX_NUMS] = ENDNULL;
+        -:  814:    bool setfunc = false;
+        1:  815:    token_get(tmp,index,rest);
+        -:  816:    //判断完set_func里面的VAR之后判断LIST  
+        1:  817:    setfunc =  list_judge_in(rest,index,arr);
+        1:  818:    return setfunc;
+        -:  819:}
+        -:  820:
+        -:  821://对list进行判断
+        1:  822:bool list_judge_in(char* tmp,const char* index, Var* arr){
+        -:  823:    bool outcome = false;
+        1:  824:    char token[MAX_NUMS] = ENDNULL;
+        1:  825:    char rest[MAX_NUMS] = ENDNULL;
+        1:  826:    int cmp = strcmp(tmp,"NIL");
+        1:  827:    if(tmp[0] == MARK && tmp[1] != LBRACKET){//SET A '1'
+        -:  828:        outcome = true;
+        1:  829:        arr[*index - CHARA].list = atom(tmp[1] - CHARZERO);
+        1:  830:        arr[*index - CHARA].ifset = true;
+    #####:  831:    }else if(tmp[0] == MARK && tmp[1] == LBRACKET){
+        -:  832:        outcome = true;//SET A '(1 2)'
+    #####:  833:        char new[MAX_NUMS] = ENDNULL;
+    #####:  834:        submark(tmp, new);
+    #####:  835:        int len = strlen(new), bracket = 0;
+    #####:  836:        for(int i = 0;i<len;i++){
+    #####:  837:            if(new[i] == LBRACKET){
+    #####:  838:                bracket++;
+    #####:  839:            }else if(new[i] == RBRACKET){
+    #####:  840:                bracket--;
+        -:  841:            }
+        -:  842:        }
+    #####:  843:        if(bracket == 0){
+    #####:  844:            arr[*index - CHARA].list = fromstring(new);
+    #####:  845:            arr[*index - CHARA].ifset = true;
+        -:  846:        }else{
+    #####:  847:            return false;
+        -:  848:        }
+    #####:  849:    }else if(tmp[0] >= 'A' && tmp[0] <= 'Z' && cmp != 0){
+        -:  850:        outcome = true;// SET C A
+    #####:  851:        if(arr[*index - tmp[0]].ifset == 1){
+    #####:  852:            arr[*index - CHARA] = arr[tmp[0] - CHARA];
+        -:  853:        }else{
+        -:  854:            printf("Can not SET!\n");
+    #####:  855:            return false;
+        -:  856:        }
+        -:  857:    }else{
+    #####:  858:        subbraces(tmp);
+    #####:  859:        token_get(tmp,token,rest);
+        -:  860:        outcome = ret_function_in(token,rest,index,arr);
+    #####:  861:        arr[*index - CHARA].ifset = true;
+        -:  862:    }
+        -:  863:    return outcome;
+        -:  864:}
+        -:  865:
+    #####:  866:bool ret_function_in(char* token,char* rest,const char* index, Var* arr){
+        -:  867:    #ifdef INTERP
+        -:  868:    bool l2 = false, l3 = false, l4 = false;
+        -:  869:    bool l5 = false, l6 = false, l7 = false,l8 = false;
+        -:  870:    if(strcmp(token,"CONS") == 0){
+        -:  871:        l2 = list_func_cons_in(rest,index,arr);
+        -:  872:    }
+        -:  873:    if(strcmp(token,"LENGTH") == 0){
+        -:  874:        l3 = int_func_length_in(rest,index,arr);
+        -:  875:    }
+        -:  876:    if(strcmp(token,"PLUS") == 0){
+        -:  877:        l4 = int_func_plus_in(rest,index,arr);
+        -:  878:    }
+        -:  879:    if(strcmp(token,"LESS") == 0 ||strcmp(token,"GREATER") == 0){
+        -:  880:        l5 = bool_func_in(token,rest,index,arr);
+        -:  881:    }
+        -:  882:    if(strcmp(token,"EQUAL") == 0){
+        -:  883:        l7 = bool_func_in(token,rest,index,arr);
+        -:  884:    }
+        -:  885:    if(strcmp(token,"MINUS") == 0){
+        -:  886:        l6 = int_func_minus_in(rest,index,arr);
+        -:  887:    }
+        -:  888:    if(strcmp(token,"APPEND") == 0){
+        -:  889:        l8 = int_func_append_in(rest,index,arr);
+        -:  890:    }
+        -:  891:    return l2 || l3 || l4 || l5 || l6 || l7|| l8;
+        -:  892:    #else
+        -:  893:    (void) arr;
+        -:  894:    (void) index;
+        -:  895:    (void) token;
+        -:  896:    (void) rest;
+    #####:  897:    return true;
+        -:  898:    #endif
+        -:  899:}
+        -:  900:
+    #####:  901:bool list_func_cons_in(char* copy,const char* index, Var* arr){
+    #####:  902:    char tmp[SIZE] = ENDNULL, rest[SIZE] = ENDNULL;
+        -:  903:    int space = 0, end = 0, start = 0, i = 0;
+    #####:  904:    int len = strlen(copy);
+    #####:  905:    while(space == 0){
+    #####:  906:        if(copy[i] == SPACESIN){
+        -:  907:            space++;
+        -:  908:            end = i;
+        -:  909:        }
+    #####:  910:        i++;
+        -:  911:    }
+    #####:  912:    for(int i = 0;i<end;i++){
+    #####:  913:        tmp[i] = copy[i];
+        -:  914:    }
+    #####:  915:    tmp[end] = ENDFILE;
+    #####:  916:    for(int i = end+1;i<len;i++){
+    #####:  917:        rest[start++] = copy[i];
+        -:  918:    }
+    #####:  919:    rest[len-end] = ENDFILE;
+        -:  920:    lisp* lisp1 = NULL;
+        -:  921:    lisp* lisp2 = NULL;
+    #####:  922:    lisp1 = get_cons_list(tmp,index,lisp1,arr);
+    #####:  923:    lisp2 = get_cons_list(rest,index,lisp2,arr);
+    #####:  924:    arr[*index - CHARA].list = cons(lisp1,lisp2);
+    #####:  925:    arr[*index - CHARA].list->atom = 1;
+    #####:  926:    return true;
+        -:  927:}
+        -:  928:
+    #####:  929:bool bool_func_in(const char* token, const char* copy, const char* index, Var* arr){
+        -:  930:    char left[SMALLSIZE] = ENDNULL;
+        -:  931:    char right[SMALLSIZE] = ENDNULL;
+    #####:  932:    left[0] = copy[0];
+    #####:  933:    right[0] = copy[TWO];
+        -:  934:    left[1] = ENDFILE;
+        -:  935:    right[1] = ENDFILE;
+    #####:  936:    int i = lisp_getval(arr[*left - CHARA].list);
+    #####:  937:    int j = lisp_getval(arr[*right - CHARA].list);
+        -:  938:    int outcome = 1;
+    #####:  939:    if(strcmp(token,"LESS") == 0){
+    #####:  940:        if(i>=j){
+        -:  941:            outcome = 0;
+        -:  942:        }
+    #####:  943:    }else if(strcmp(token,"GREATER") == 0){
+    #####:  944:        if(i<=j){
+        -:  945:            outcome = 0;
+        -:  946:        }
+        -:  947:    }else{
+    #####:  948:        if(i!=j){
+        -:  949:            outcome = 0;
+        -:  950:        }
+        -:  951:    }
+    #####:  952:    arr[*index - CHARA].list = atom(outcome);
+    #####:  953:    return outcome;
+        -:  954:}
+        -:  955:
+        -:  956:
+    #####:  957:bool int_func_plus_in(char* copy, const char* index, Var* arr){
+    #####:  958:    char rest1[SMALLSIZE] = ENDNULL;
+    #####:  959:    char rest2[SMALLSIZE] = ENDNULL;
+    #####:  960:    split_list(copy,rest1,rest2);
+        -:  961:    int rest1_val = 0;
+        -:  962:    int rest2_val = 0;
+    #####:  963:    rest1_val = getplus(rest1,index,arr);
+    #####:  964:    rest2_val = getplus(rest2,index,arr);
+        -:  965:    int i =0;
+    #####:  966:    i = rest1_val + rest2_val;
+    #####:  967:    arr[*index - CHARA].list = atom(i);
+    #####:  968:    arr[*index - CHARA].ifset = 1;
+    #####:  969:    return true;
+        -:  970:}
+        -:  971:
+    #####:  972:bool int_func_length_in(char* copy, const char* index, Var* arr){
+    #####:  973:    int i =lisp_length(arr[*copy - CHARA].list);
+    #####:  974:    arr[*index - CHARA].list = atom(i);
+    #####:  975:    arr[*index - CHARA].ifset = 1;
+    #####:  976:    return true;
+        -:  977:}
+        -:  978:
+        -:  979:
+        -:  980:
+        4:  981:void submark(char* token, char* new){
+        4:  982:    char tmp[SIZE] = ENDNULL;
+        4:  983:    int len = strlen(token);
+        -:  984:    int start = 0;
+       24:  985:    for(int i = 1;i<len-1;i++){
+       20:  986:        tmp[start++] = token[i];
+        -:  987:    }
+        -:  988:    start = 0;
+       24:  989:    for(int i = 0;i<len-TWO;i++){
+       20:  990:        new[i] = tmp[start++];
+        -:  991:    }
+        4:  992:    new[len-TWO] = ENDFILE;
+        4:  993:}
+        -:  994:
+        -:  995:
+    #####:  996:void judge_negative(char* cur){
+    #####:  997:    if(cur[0] == MINUSMARK){
+    #####:  998:        cur[0] = (cur[1] - CHARZERO) * NEGITAVEVAL;
+    #####:  999:        cur[1] = ENDFILE;
+        -: 1000:    }
+    #####: 1001:}
+        -: 1002:
+        -: 1003:
+        -: 1004:
+        4: 1005:lisp* get_cons_list(char* tmp,const char* index, lisp* l, Var* arr){
+        4: 1006:    char new[SIZE] = ENDNULL;
+        4: 1007:    if(tmp[0] == MARK){
+        -: 1008:        // '1' 
+        4: 1009:        submark(tmp,new);
+        4: 1010:        if(strlen(new) == 1){
+        1: 1011:            l = atom(*new - CHARZERO);
+        -: 1012:        }else{//'(1 (2 3))'
+        3: 1013:            l = fromstring(new);
+        -: 1014:        }
+    #####: 1015:    }else if(tmp[0] == LBRACKET){//(cons ...)
+    #####: 1016:        subbraces(tmp);
+    #####: 1017:        char token[SMALLSIZE] = ENDNULL;
+    #####: 1018:        char rest[SIZE] = ENDNULL;
+    #####: 1019:        token_get(tmp,token,rest);
+    #####: 1020:        if(strcmp(token,"CONS") == 0){
+    #####: 1021:            list_func_cons_in(rest,index,arr);
+        -: 1022:        }
+    #####: 1023:    }else if(strcmp(tmp,"NIL") == 0){//NIL
+        -: 1024:        return NIL;
+        -: 1025:    }
+        -: 1026:    else{//A
+    #####: 1027:        l = arr[*tmp - CHARA].list;
+        -: 1028:    }
+        -: 1029:    return l;
+        -: 1030:}
+        -: 1031:
+    #####: 1032:void split_print_cons(char* tmp, char* token, char* rest){
+    #####: 1033:    int len = strlen(tmp);
+    #####: 1034:    for(int i = 0;i<THREE;i++){
+    #####: 1035:        token[i] = tmp[i];
+        -: 1036:    }
+        -: 1037:    int start = 0;
+    #####: 1038:    for(int i = THREE+1;i<len;i++){
+    #####: 1039:        rest[start++] = tmp[i];
+        -: 1040:    }
+    #####: 1041:}
+        -: 1042:
+        -: 1043:
+    #####: 1044:lisp* print_cons(char* tmp,char* index, lisp* l, Var* arr){
+        -: 1045:    (void) index;
+    #####: 1046:    char new[SIZE] = ENDNULL;
+    #####: 1047:    if(tmp[0] == MARK){//'1'
+    #####: 1048:        submark(tmp,new);
+    #####: 1049:        l = atom(*new - CHARZERO);
+    #####: 1050:    }else if(tmp[0] == LBRACKET){//(cons ...)
+    #####: 1051:        subbraces(tmp);
+    #####: 1052:        char token[SMALLSIZE] = ENDNULL;
+    #####: 1053:        char rest[SIZE] = ENDNULL;
+    #####: 1054:        char rest1[SIZE] = ENDNULL;
+    #####: 1055:        char rest2[SIZE] = ENDNULL;
+    #####: 1056:        token_get(tmp,token,rest);
+    #####: 1057:        split_print_cons(rest,rest1,rest2);
+    #####: 1058:        if(strcmp(token,"CONS") == 0){
+    #####: 1059:            lisp* l1 = print_cons(rest1,index,l,arr);
+    #####: 1060:            lisp* l2 = print_cons(rest2,index,l,arr);
+    #####: 1061:            l = cons(l1,l2);
+        -: 1062:        }
+    #####: 1063:    }else if(strcmp(tmp,"NIL") == 0){//NIL
+    #####: 1064:        return NIL;
+        -: 1065:    }
+        -: 1066:    return l;
+        -: 1067:}
+        -: 1068:
+        -: 1069:
+    #####: 1070:int getplus(char* rest, const char* index, Var* arr){
+    #####: 1071:    char new[SIZE] = ENDNULL;
+        -: 1072:    int val = 0;
+    #####: 1073:    if(rest[0] == MARK){//'1'
+    #####: 1074:        submark(rest,new);
+    #####: 1075:        if(new[0] == MINUSMARK){
+    #####: 1076:            new[0] = new[1];
+        -: 1077:            new[1] = ENDFILE;
+    #####: 1078:            val = (*new - CHARZERO) * NEGITAVEVAL;
+        -: 1079:        }else{
+    #####: 1080:            val = *new - CHARZERO;
+        -: 1081:        }
+    #####: 1082:    }else if(rest[0] == LBRACKET){
+    #####: 1083:        if(rest[FIVE] == LBRACKET){//(CAR (CDR L))
+    #####: 1084:            cdr(arr[rest[TEN] - CHARA].list)->type = 1;
+        -: 1085:            lisp* l =NULL;
+    #####: 1086:            arr[rest[TEN] - CHARA].list->type = 1;
+    #####: 1087:            l = arr[rest[TEN] - CHARA].list;
+    #####: 1088:            l = cdr(l);
+    #####: 1089:            l->type = 1;
+    #####: 1090:            val = lisp_getval(car(l));
+        -: 1091:        }else{//(CAR L)
+    #####: 1092:            arr[rest[FIVE] - CHARA].list->type = 1;
+    #####: 1093:            val = lisp_getval(car(arr[rest[FIVE] - CHARA].list));
+        -: 1094:        }  
+        -: 1095:    }else{//A
+    #####: 1096:        val = lisp_getval(arr[*rest - CHARA].list);
+        -: 1097:    }
+        -: 1098:    (void) index;
+    #####: 1099:    return val;
+        -: 1100:}
+        -: 1101:
+    #####: 1102:void split_plus(char* copy, char* rest1, char* rest2){
+        -: 1103:    int bracket = 0, mark = 0, end = 0;
+    #####: 1104:    int len = strlen(copy);
+        -: 1105:    int i = 0, start = 0, begin = 0;
+    #####: 1106:    while(end == 0){
+    #####: 1107:        if(copy[i] == LBRACKET){
+    #####: 1108:            bracket++;
+    #####: 1109:        }else if(copy[i] == RBRACKET){
+    #####: 1110:            bracket--;
+    #####: 1111:        }else if(copy[i] == MARK){
+    #####: 1112:            mark++;
+        -: 1113:        }
+    #####: 1114:        if(copy[i] == RBRACKET && bracket==0 && mark%TWO==0){
+        -: 1115:            end = i;
+        -: 1116:        }
+    #####: 1117:        i++;
+        -: 1118:    }
+    #####: 1119:    for(int i = 0;i<end+1;i++){
+    #####: 1120:        rest1[i] = copy[i];
+        -: 1121:    }
+    #####: 1122:    rest1[end+1] = ENDFILE;
+    #####: 1123:    while(begin == 0){
+    #####: 1124:        if(copy[end++] == LBRACKET){
+        -: 1125:            begin = end;
+        -: 1126:        }
+        -: 1127:    }
+    #####: 1128:    for(int i = begin-1;i<len;i++){
+    #####: 1129:        rest2[start++] = copy[i];
+        -: 1130:    }
+    #####: 1131:    rest2[start] = ENDFILE;
+    #####: 1132:}
+        -: 1133:
+    #####: 1134:bool judge_cond(char* condition, Var* arr){
+    #####: 1135:    subbraces(condition);
+    #####: 1136:    char token[SMALLSIZE] = ENDNULL, rest[SMALLSIZE] = ENDNULL;
+    #####: 1137:    char rest1[SMALLSIZE] = ENDNULL, rest2[SMALLSIZE] = ENDNULL;
+    #####: 1138:    char new1[SMALLSIZE] = ENDNULL, new2[SMALLSIZE] = ENDNULL;
+    #####: 1139:    token_get(condition,token,rest);
+    #####: 1140:    split_list(rest,rest1,rest2);
+    #####: 1141:    submark(rest1,new1);
+    #####: 1142:    submark(rest2,new2);
+    #####: 1143:    if(strcmp(token,"EQUAL") == 0){
+    #####: 1144:        if(rest1[1] == CHARL){
+    #####: 1145:            char token11[SIZE] = ENDNULL, rest11[SIZE] = ENDNULL;
+    #####: 1146:            token_get(rest1,token11,rest11);
+    #####: 1147:            int i = getlength(rest11,arr);
+    #####: 1148:            if(i - *new2 == 0){
+    #####: 1149:                return true;
+        -: 1150:            }
+    #####: 1151:        }else if(rest1[1] == CHARC){//(car L)
+        -: 1152:            int i = 0;
+    #####: 1153:            i = lisp_getval(car(arr[rest1[FIVE] - CHARA].list));
+    #####: 1154:            if(i - *new2 == 0){
+        -: 1155:                return true;
+        -: 1156:            }
+        -: 1157:        }
+    #####: 1158:        if(*new1 - *new2 == 0){
+    #####: 1159:            return true;
+        -: 1160:        }
+    #####: 1161:    }else if(strcmp(token,"GREATER") == 0){
+    #####: 1162:        if(*new1 - *new2 > 0){
+    #####: 1163:            return true;
+        -: 1164:        }
+    #####: 1165:    }else if(strcmp(token,"LESS") == 0){
+        -: 1166:        //(LESS '1' '2')(LESS '0' C)(LESS '1' '2')(LESS C '20')
+        -: 1167:        int i =0, j =0;
+    #####: 1168:        char new123[SIZE] = ENDNULL;
+    #####: 1169:        if(*rest1 >= CHARA && *rest1 <= 'Z'){//A
+    #####: 1170:            i = lisp_getval(arr[*rest1 -CHARA].list);
+        -: 1171:        }else{//'1'
+    #####: 1172:            submark(rest1,new123);
+    #####: 1173:            i = *new123 - CHARZERO;
+        -: 1174:        }
+    #####: 1175:        if(*rest2 >= CHARA && *rest2 <= 'Z'){//A
+    #####: 1176:            j = lisp_getval(arr[*rest2 -CHARA].list);
+        -: 1177:        }else{//'1'
+    #####: 1178:            submark(rest2,new123);
+    #####: 1179:            if(strlen(new123)!=1){
+    #####: 1180:                j = (new123[0] - CHARZERO) * TEN + (new123[1] - CHARZERO);
+        -: 1181:            }else{
+    #####: 1182:                j = *new123 - CHARZERO;
+        -: 1183:            }
+        -: 1184:        }
+    #####: 1185:        if(i < j ){
+    #####: 1186:            return true;
+        -: 1187:        }
+        -: 1188:    }
+        -: 1189:    return false;
+        -: 1190:}
+        -: 1191:
+    #####: 1192:int judge_bracket(const char* copy){
+        -: 1193:    int bracket = 1;
+        -: 1194:    int index = 1;
+    #####: 1195:    while(bracket != 0){
+    #####: 1196:        if(copy[index] == LBRACKET){
+    #####: 1197:            bracket++;
+    #####: 1198:        }else if(copy[index] == RBRACKET){
+    #####: 1199:            bracket--;
+        -: 1200:        }
+    #####: 1201:        index++;
+        -: 1202:    }
+    #####: 1203:    return index;
+        -: 1204:}
+        -: 1205:
+    #####: 1206:int getlength(char* rest11, Var* arr){
+    #####: 1207:    if(strcmp(rest11,"NIL") == 0){
+        -: 1208:        return 0;
+    #####: 1209:    }else if(rest11[0] == LBRACKET){
+    #####: 1210:        return rest11[1];
+        -: 1211:    }else{
+    #####: 1212:        return lisp_length(arr[*rest11 - CHARA].list);
+        -: 1213:    }
+        -: 1214:}
+        -: 1215:
+        -: 1216:
+    #####: 1217:void addbraces(char* copy){
+    #####: 1218:    char tmp[SIZE] = ENDNULL;
+    #####: 1219:    int len = strlen(copy);
+    #####: 1220:    tmp[0] = LBRACKET;
+    #####: 1221:    for(int i = 0;i<len;i++){
+    #####: 1222:        tmp[i+1] = copy[i];
+        -: 1223:    }
+    #####: 1224:    tmp[len+1] = RBRACKET;
+    #####: 1225:    tmp[len+TWO] = ENDFILE;
+    #####: 1226:    int len1 = strlen(tmp);
+    #####: 1227:    for(int i = 0;i<len1;i++){
+    #####: 1228:        copy[i] = tmp[i];
+        -: 1229:    }
+    #####: 1230:    copy[len1+1] = ENDFILE;
+    #####: 1231:}
+        -: 1232:
+    #####: 1233:void sub(char* copy){
+    #####: 1234:    char tmp[SIZE] = ENDNULL;
+        -: 1235:    int bracket = 0, bracket2 = 0, lbracket = 0;
+        -: 1236:    int begin = 0, start = 0, start1 = 0, start2 = 0;
+    #####: 1237:    int len = strlen(copy);
+    #####: 1238:    for(int i = 0;i<len;i++){
+    #####: 1239:        if(copy[i] == LBRACKET || copy[i] == RBRACKET){
+    #####: 1240:            bracket++;
+        -: 1241:        }
+        -: 1242:    }
+    #####: 1243:    while(begin == 0){
+    #####: 1244:        if(copy[start++] == LBRACKET){
+    #####: 1245:            lbracket++;
+        -: 1246:        }
+    #####: 1247:        if(lbracket == TWO){
+        -: 1248:            begin = start - 1;//找到第二个括号
+        -: 1249:        }
+        -: 1250:    }
+    #####: 1251:    while(bracket - bracket2 != 1){
+    #####: 1252:        if(copy[start1] == LBRACKET || copy[start1] == RBRACKET){
+    #####: 1253:            bracket2++;
+        -: 1254:        }
+    #####: 1255:        start1++;//找到倒数第二个括号
+        -: 1256:    }
+    #####: 1257:    for(int i = begin;i<start1;i++){
+    #####: 1258:        tmp[start2++] = copy[i];
+        -: 1259:    }
+    #####: 1260:    int len1 = strlen(tmp);
+    #####: 1261:    for(int i = 0;i<len1+1;i++){
+    #####: 1262:        copy[i] = tmp[i];
+        -: 1263:    }
+    #####: 1264:    copy[len1+TWO] = ENDFILE;
+    #####: 1265:}
+        -: 1266:
+    #####: 1267:void free_var(Var* arr){
+    #####: 1268:    for(int i = 0;i<ALPHA+1;i++){
+    #####: 1269:        lisp_free(&arr[i].list);
+        -: 1270:    }
+    #####: 1271:}
+        -: 1272:
+        -: 1273:
+        -: 1274://extension
+        -: 1275:
+        -: 1276:
+    #####: 1277:bool int_func_minus_in(char* copy, const char* index, Var* arr){
+    #####: 1278:    char rest1[SMALLSIZE] = ENDNULL;
+    #####: 1279:    char rest2[SMALLSIZE] = ENDNULL;
+    #####: 1280:    split_list(copy,rest1,rest2);
+        -: 1281:    int rest1_val = 0;
+        -: 1282:    int rest2_val = 0;
+    #####: 1283:    rest1_val = getplus(rest1,index,arr);
+    #####: 1284:    rest2_val = getplus(rest2,index,arr);
+        -: 1285:    int i =0;
+    #####: 1286:    i = rest1_val + rest2_val;
+    #####: 1287:    arr[*index - CHARA].list = atom(i);
+    #####: 1288:    arr[*index - CHARA].ifset = 1;
+    #####: 1289:    return true;
+        -: 1290:}
+        -: 1291:
+    #####: 1292:bool int_func_append_in(char* copy, const char* index, Var* arr){
+    #####: 1293:    char tmp[SIZE] = ENDNULL, rest[SIZE] = ENDNULL;
+    #####: 1294:    char new1[SIZE] = ENDNULL, new2[SIZE] = ENDNULL;
+        -: 1295:    int mark = 0, end = 0, start = 0, i = 0;
+        -: 1296:    int count = 0;
+    #####: 1297:    int len = strlen(copy);
+    #####: 1298:    while(mark != 2){
+    #####: 1299:        if(copy[i] == MARK){
+    #####: 1300:            mark++;
+        -: 1301:            end = i;
+        -: 1302:        }
+    #####: 1303:        i++;
+        -: 1304:    }
+    #####: 1305:    for(int i = 0;i<end+1;i++){
+    #####: 1306:        tmp[i] = copy[i];
+        -: 1307:    }
+    #####: 1308:    tmp[end+1] = ENDFILE;
+    #####: 1309:    for(int i = end+TWO;i<len;i++){
+    #####: 1310:        rest[start++] = copy[i];
+        -: 1311:    }
+    #####: 1312:    rest[len-end] = ENDFILE;
+    #####: 1313:    submark(tmp,new1);
+    #####: 1314:    submark(rest,new2);
+    #####: 1315:    subbraces(new2);
+        -: 1316:    int len2 = strlen(new2);
+        -: 1317:    for(int i = 0;i<len2;i++){
+        -: 1318:        if(new2[i] != MARK && new2[i] != SPACESIN){
+        -: 1319:            count++;
+        -: 1320:        }
+        -: 1321:    }
+        -: 1322:    lisp* lisp1 = NULL;
+    #####: 1323:    lisp1 = fromstring(new1);
+    #####: 1324:    if(lisp1->cdr != NULL){
+        -: 1325:    }
+        -: 1326:    lisp* l2 = lisp1->cdr;
+    #####: 1327:    l2->cdr = fromstring(new2);
+    #####: 1328:    arr[*index - CHARA].list = l2;
+        -: 1329:    // arr[*index - CHARA].list->atom = 1;
+    #####: 1330:    return true;
+        -: 1331:
+        -: 1332:}
+        -: 1333:
+        -: 1334:
+        -: 1335:
+        -: 1336://test
+        -: 1337:
+        1: 1338:void testinterp(){
+        1: 1339:    char test[SIZE] = ENDNULL;
+        1: 1340:    char rest[SIZE] = ENDNULL;
+        1: 1341:    char token[SIZE] = ENDNULL;
+        1: 1342:    char index[SMALLSIZE] = "A";
+        1: 1343:    char tmp[SIZE] = ENDNULL;
+        1: 1344:    char rest2[SIZE] = ENDNULL;
+        1: 1345:    char str[SIZE] = ENDNULL;
+        -: 1346:    
+        1: 1347:    lisp* lisp1 = NULL;
+        1: 1348:    lisp* lisp2 = NULL;
+        -: 1349:
+        1: 1350:    Var arr[ALPHA] = {{false, NULL}};
+        -: 1351:    //unit test1
+        -: 1352:    strcpy(test, "(CAR '(1 2 3))')");
+        1: 1353:    subbraces(test);
+       1*: 1354:    assert(fun_cmp_in("CAR", "'(1 2 3))'",arr) == false);
+       1*: 1355:    assert(instract_judge_in(test,arr) == false);
+        -: 1356:
+        -: 1357:    //unit test2
+        -: 1358:    strcpy(test, "(LESS '2' '1')");
+       1*: 1359:    assert(instract_judge_in(test,arr) == false);
+        -: 1360:
+        -: 1361:    //unit test3
+        -: 1362:    strcpy(test, "(GREATER '1' '2')");
+       1*: 1363:    assert(instract_judge_in(test,arr) == false);
+        -: 1364:
+        -: 1365:    //unit test4
+        -: 1366:    strcpy(test, "(EQUAL '2' '1')");
+       1*: 1367:    assert(instract_judge_in(test,arr) == false);
+        -: 1368:
+        -: 1369:    //unit test5
+        -: 1370:    strcpy(test, "(CONS '1' '(1 2 3)')");
+        1: 1371:    subbraces(test);
+        1: 1372:    token_get(test,token,rest);
+        -: 1373:    strcpy(tmp, "'1'");
+        -: 1374:    strcpy(rest2, "'(1 2 3)'");
+        1: 1375:    lisp1 = get_cons_list(tmp,index,lisp1,arr);
+        1: 1376:    lisp2 = get_cons_list(rest2,index,lisp2,arr);
+        1: 1377:    arr[*index - CHARA].list = cons(lisp1,lisp2);
+        1: 1378:    arr[*index - CHARA].list->atom = 1;
+        1: 1379:    lisp_tostring(arr[*index - CHARA].list,str);
+       1*: 1380:    assert(strcmp(str,"(1 1 2 3)") == 0);
+        1: 1381:    lisp_free(&lisp1);
+        1: 1382:    lisp_free(&lisp2);
+        -: 1383:
+        -: 1384:
+        -: 1385:    //unit test6
+        -: 1386:    strcpy(test, "(CONS '(1 2 3)' '(4 5)')");
+        1: 1387:    subbraces(test);
+        1: 1388:    token_get(test,token,rest);
+        -: 1389:    strcpy(tmp,"'(1 2 3)'" );
+        -: 1390:    strcpy(rest2,"'(4 5)'");
+        1: 1391:    lisp1 = get_cons_list(tmp,index,lisp1,arr);
+        1: 1392:    lisp2 = get_cons_list(rest2,index,lisp2,arr);
+        1: 1393:    arr[*index - CHARA].list = cons(lisp1,lisp2);
+        1: 1394:    arr[*index - CHARA].list->atom = 1;
+        1: 1395:    lisp_tostring(arr[*index - CHARA].list,str);
+       1*: 1396:    assert(strcmp(str,"((1 2 3) 4 5)") == 0);
+        1: 1397:    lisp_free(&lisp1);
+        1: 1398:    lisp_free(&lisp2);
+        -: 1399:
+        -: 1400:    //unit test7
+        -: 1401:    strcpy(test, "(SET A '1')");
+        1: 1402:    subbraces(test);
+        1: 1403:    token_get(test,token,rest);
+        1: 1404:    set_func_in(rest,arr);
+       1*: 1405:    assert(lisp_getval(arr[0].list) == 1);
+        -: 1406:
+        -: 1407:
+        1: 1408:}
+        -: 1409:
+        -: 1410:
+        -: 1411:
+        -: 1412:
+        -: 1413:
